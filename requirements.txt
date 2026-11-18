@@ -1,0 +1,18 @@
+# Agno agent framework
+agno>=1.6
+
+# API
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+
+# Settings
+pydantic>=2.7
+pydantic-settings>=2.3
+
+# Database
+SQLAlchemy>=2.0
+psycopg[binary]>=3.2
+
+# PDF text extraction (local, no cloud OCR)
+pdfplumber>=0.11

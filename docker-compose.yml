@@ -1,0 +1,62 @@
+# Local stack: the FastAPI app plus a Postgres 16 database.
+# Values are read from .env when present (Compose loads it automatically).
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-agno}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agno}
+      POSTGRES_DB: ${POSTGRES_DB:-agno}
+    ports:
+      # Host port is configurable; the container always listens on 5432.
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-agno} -d ${POSTGRES_DB:-agno}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped
+
+  app:
+    build: .
+    depends_on:
+      db:
+        # The app only starts once Postgres reports healthy.
+        condition: service_healthy
+    environment:
+      AGNO_MODEL_PROVIDER: ${AGNO_MODEL_PROVIDER:-openai}
+      MODEL_NAME: ${MODEL_NAME:-gpt-4o-mini}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      POSTGRES_USER: ${POSTGRES_USER:-agno}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agno}
+      POSTGRES_DB: ${POSTGRES_DB:-agno}
+      # Inside the compose network the database is reached by service name.
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  pgdata:
