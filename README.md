@@ -22,6 +22,28 @@ Nothing fails because a field is missing. Every field is optional, and a value t
 be read (a date like "end of March", an amount like "as per schedule") is stored as `NULL`
 while the rest of the document is kept.
 
+## How a document flows
+
+```mermaid
+flowchart TD
+    Client["Client<br/>uploads a PDF"] -->|"POST /documents"| API["FastAPI endpoint<br/>app/main.py"]
+    API --> Check{"PDF under 25 MB?"}
+    Check -->|"no"| Reject["413 / 415 / 422<br/>nothing stored"]
+    Check -->|"yes"| Text["pdfplumber text extraction<br/>app/tools/pdf_tools.py"]
+    Text --> HasText{"any text?"}
+    HasText -->|"no, e.g. a scan"| Store["store one row<br/>app/services/ingest.py"]
+    HasText -->|"yes"| Agent["insurance-pdf-parser agent<br/>app/agents/insurance_parser.py"]
+    Agent -->|"single JSON object"| Parse["lenient parse, every field optional<br/>app/schemas.py"]
+    Agent -->|"model call fails"| Failed["502<br/>nothing stored"]
+    Parse --> Store
+    Store --> DB[("Postgres<br/>insurance_documents")]
+    DB --> Read["GET /documents<br/>GET /documents/{id}"]
+```
+
+The agent also holds the PDF tool itself, so it can re-read the file when the extracted
+text looks truncated; the extraction above runs first so the stored raw text is always
+the full, unedited output.
+
 ## Quickstart with Docker Compose
 
 ```bash
